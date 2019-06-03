@@ -44,7 +44,7 @@ board = raspberrypi_2b
 ## Todo
 
 - [ ] Write tests
-- [ ] Add support for native target (`platform - native`)
+- [ ] Add support for native target (`platform = native`)
 - [ ] Add support for unit testing
 
 ## Contributing
