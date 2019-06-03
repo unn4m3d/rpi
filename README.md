@@ -22,7 +22,7 @@ Crystal plugin for use with [platformio](https://platformio.org). Allows writing
 
 Example platformio.ini configuration:
 
-:warning: **(Linux)** You **MUST** use `https://github.com/unn4m3d/platform-linux_arm` as a platform in order to compile your C/C++ code because PlatformIO doesn't provide an `arm-unknown-linux-gnueabihf` toolchain for linux x86_64
+:warning: **(Linux)** You **MUST** use `https://github.com/unn4m3d/platform-linux_arm#develop` as a platform in order to compile your C/C++ code because PlatformIO doesn't provide an `arm-unknown-linux-gnueabihf` toolchain for linux x86_64
 
 ```ini
 
@@ -37,7 +37,7 @@ crystal_arch = arm-unknown-linux-gnueabihf # default
 crystal_shards_bin = shards # default
 
 [env:rpi2]
-platform = https://github.com/unn4m3d/platform-linux_arm
+platform = https://github.com/unn4m3d/platform-linux_arm#develop
 board = raspberrypi_2b
 ```
 
