@@ -41,6 +41,12 @@ platform = https://github.com/unn4m3d/platform-linux_arm#develop
 board = raspberrypi_2b
 ```
 
+## Todo
+
+- [ ] Write tests
+- [ ] Add support for native target (`platform - native`)
+- [ ] Add support for unit testing
+
 ## Contributing
 
 1. Fork it (<https://github.com/unn4m3d/rpi/fork>)
