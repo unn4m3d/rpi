@@ -2,7 +2,8 @@ language: crystal
 
 
 before_install:
-  - pyenv global 2.7.10
+  - sudo apt update
+  - sudo apt install -y python-pip
   - pip2 install -U https://github.com/platformio/platformio-core/archive/develop.zip
 
 script:
