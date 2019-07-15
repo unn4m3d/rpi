@@ -22,7 +22,7 @@ Crystal plugin for use with [platformio](https://platformio.org). Allows writing
 
 Example platformio.ini configuration:
 
-:warning: **(Linux)** You **MUST** use `https://github.com/unn4m3d/platform-linux_arm` as a platform in order to compile your C/C++ code because PlatformIO doesn't provide an `arm-unknown-linux-gnueabihf` toolchain for linux x86_64
+:warning: **(Linux)** You **MUST** use `https://github.com/unn4m3d/platform-linux_arm#develop` as a platform in order to compile your C/C++ code because PlatformIO doesn't provide an `arm-unknown-linux-gnueabihf` toolchain for linux x86_64
 
 ```ini
 
@@ -37,7 +37,7 @@ crystal_arch = arm-unknown-linux-gnueabihf # default
 crystal_shards_bin = shards # default
 
 [env:rpi2]
-platform = https://github.com/unn4m3d/platform-linux_arm
+platform = https://github.com/unn4m3d/platform-linux_arm#develop
 board = raspberrypi_2b
 ```
 
@@ -81,6 +81,12 @@ ln -s /lib/libatomic_ops.so /lib/libatomic_ops.so.1
 # Alternatively, you can cross-compile libgc and libatomic ops on more powerful machine and then copy it to your RPi
 # It should be faster to build, but probably harder to setup cross-compilation environment
 ```
+
+## Todo
+
+- [ ] Write tests
+- [ ] Add support for native target (`platform = native`)
+- [ ] Add support for unit testing
 
 ## Contributing
 
