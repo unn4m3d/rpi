@@ -1,5 +1,5 @@
 language: crystal
-
+dist: xenial
 
 before_install:
   - sudo apt update
