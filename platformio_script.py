@@ -1,10 +1,11 @@
 Import("env")
 from platformio import util
-from platformio.project.helpers import get_project_build_dir
+from platformio.project.helpers import get_project_build_dir, get_project_dir
+from platformio.project.config import ProjectConfig
 from os.path import basename, join, relpath, abspath
 import base64
 
-config = util.load_project_config()
+config = ProjectConfig.get_instance(join(get_project_dir(), "platformio.ini"))
 
 def get_envname():
     return base64.b64decode(ARGUMENTS["PIOENV"])
@@ -62,9 +63,11 @@ def add_compile_crystal_target():
     env.Append(LINKFLAGS="-L./lib/rpi/libraries -rdynamic -lpcre -lpthread -levent -lrt -ldl %s -l:libatomic_ops.so.1" % libgc)
 
 def add_compile_crystal_extension():
-    libname = join(get_project_build_dir(), get_envname(), "libcrystal.a")
+    env.Append(SRC_FILTER="-<*/ext/sigfault.c>")
+    #libname = join(get_project_build_dir(), get_envname(), "libcrystal.a")
     #libname = "crystal"
-    env.StaticLibrary(libname, ["src/ext/sigfault.c"])
+    libname = join(get_project_build_dir(), get_envname(), "crystal.o")
+    env.Object(libname, ["src/ext/sigfault.c"])
     env.Append(LINKFLAGS=libname)
     #env.Append(PIOBUILDFILES=abspath(libname))
     env.Depends("%s/%s/program" % (get_project_build_dir(), envname), libname)
