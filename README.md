@@ -1,5 +1,7 @@
 # rpi
 
+[![Build Status](https://travis-ci.com/unn4m3d/rpi.svg?branch=master)](https://travis-ci.com/unn4m3d/rpi)
+
 :warning: This is very experimental
 
 :warning: Works with development version of PlatformIO only (tested with `v4.0.0a16`)
