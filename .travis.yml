@@ -1,0 +1,9 @@
+language: crystal
+
+
+before_install:
+  - pyenv global 2.7.10
+  - pip2 install -U https://github.com/platformio/platformio-core/archive/develop.zip
+
+script:
+  - cd test && pio run -v
