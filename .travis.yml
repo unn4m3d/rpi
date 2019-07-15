@@ -4,7 +4,7 @@ dist: xenial
 before_install:
   - sudo apt update
   - sudo apt install -y python-pip
-  - pip2 install -U https://github.com/platformio/platformio-core/archive/develop.zip
+  - sudo pip2 install -U https://github.com/platformio/platformio-core/archive/develop.zip
 
 script:
   - cd test && pio run -v
