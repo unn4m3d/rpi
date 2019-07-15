@@ -4,7 +4,7 @@
 
 :warning: This is very experimental
 
-:warning: Works with development version of PlatformIO only (tested with `v4.0.0a16`)
+:warning: Works with development version of PlatformIO only (tested with `v4.0.0`)
 
 Crystal plugin for use with [platformio](https://platformio.org). Allows writing code in Crystal targeting RaspberryPi (by default).
 
