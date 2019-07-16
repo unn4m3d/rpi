@@ -2,10 +2,11 @@ Import("env")
 from platformio import util
 from platformio.project.helpers import get_project_build_dir, get_project_dir
 from platformio.project.config import ProjectConfig
-from os.path import basename, join, relpath, abspath, isfile
+from os.path import basename, join, relpath, abspath, isfile, exists
 from os import environ
 import base64
 import subprocess
+import re
 
 config = ProjectConfig.get_instance(join(get_project_dir(), "platformio.ini"))
 
@@ -15,41 +16,54 @@ def get_envname():
 envname = get_envname()
 print("PBD: %s, env : %s" % (relpath(get_project_build_dir()), envname))
 
-def get_crystal_target():
-    if config.has_option("env:" + envname, "crystal_target"):
-        return config.get("env:" + envname, "crystal_target")
+def get_option(section, option, dft):
+    if config.has_option(section, option):
+        return config.get(section, option)
     else:
-        return "main"
+        return dft
+
+def get_crystal_target():
+    return get_option("env:%s" % envname, "crystal_target", "main")
 
 def get_crystal_build_flags():
-    if config.has_option("env:" + envname, "crystal_build_flags"):
-        return config.get("env:" + envname, "crystal_build_flags")
-    else:
-        return ""
+    return get_option("env:%s" % envname, "crystal_build_flags", "")
 
 def get_shards_binary():
-    if config.has_option("env:" + envname, "crystal_shards_bin"):
-        return config.get("env:" + envname, "crystal_shards_bin")
-    else:
-        return "shards"
+    return get_option("env:%s" % envname, "crystal_shards_bin", "shards")
 
 def get_crystal_binary():
-    if config.has_option("env:" + envname, "crystal_bin"):
-        return config.get("env:" + envname, "crystal_bin")
-    else:
-        return "crystal"
+    return get_option("env:%s" % envname, "crystal_bin", "crystal")
 
 def get_crystal_triple():
-    if config.has_option("env:" + envname, "crystal_arch"):
-        return config.get("env:" + envname, "crystal_arch")
-    else:
-        return "arm-unknown-linux-gnueabihf"
+    return get_option("env:%s" % envname, "crystal_arch", "arm-unknown-linux-gnueabihf")
 
 def get_crystal_lib_path():
-    if config.has_option("env:" + envname, "crystal_path_extra"):
-        return config.get("env:" + envname, "crystal_path_extra")
-    else:
-        return "./lib"
+    return get_option("env:%s" % envname, "crystal_path_extra", "./lib")
+
+def add_link_flags(tgt, src, env):
+    system("echo ALF > .fools")
+    libpath = join(get_crystal_lib_path(), "rpi", "libraries")
+    local_libraries_exist = exists(join(get_project_dir(), "libraries"))
+    local_libpath = " -L" + join(get_project_dir(), "libraries") if local_libraries_exist else ""
+
+    with open(str(src[0]), 'r') as lcf:
+        linker_cmdline = lcf.read()
+
+    skip_idx = linker_cmdline.index("-rdynamic")
+    linker_cmdline = linker_cmdline[skip_idx:]
+
+    libdir_pt = re.compile('-L[^\s]+')
+    libcrystal_pt = re.compile('/[^\s]*libcrystal.a')
+
+    linker_cmdline = libdir_pt.sub('', libcrystal_pt.sub('', linker_cmdline))
+    print("Final crystal link args : %s" % linker_cmdline)
+
+    env.Append(LINKFLAGS="-L%s%s -l:libatomic_ops.so.1 %s" %(libpath, local_libpath, linker_cmdline))
+
+
+def add_link_flags_adder():
+    alf = Builder(action = add_link_flags)
+    env.Append(BUILDERS = {'AddLinkFlags' : alf})
 
 
 def add_compile_crystal_target():
@@ -58,13 +72,15 @@ def add_compile_crystal_target():
     print("output file : %s" % output_obj_file)
 
     shard_yml = isfile("shard.yml")
+    linker_cmdline_file = join(get_project_build_dir(), envname, "__linker_cmd_{}".format(relpath(input_file)))
 
-    compile = "{bin} build {crystal_target} --verbose -o{output} --cross-compile --target={target} {flags}".format(
+    compile = "{bin} build {crystal_target} --verbose -o{output} --cross-compile --target={target} {flags} > {file}".format(
         bin = get_shards_binary() if shard_yml else get_crystal_binary(),
         crystal_target = input_file if shard_yml or isfile(input_file) else "src/%s.cr" % input_file ,
         output = output_obj_file,
         target = get_crystal_triple(),
-        flags = get_crystal_build_flags()
+        flags = get_crystal_build_flags(),
+        file = linker_cmdline_file
     )
 
     output_obj_file = output_obj_file + ".o"
@@ -80,11 +96,11 @@ def add_compile_crystal_target():
 
     env.Depends("%s/%s/program" % (get_project_build_dir(), envname), output_obj_file)
     env.Append(PIOBUILDFILES=abspath(output_obj_file))
-    #env.Append(PIOBUILDFILES=abspath("./lib/rpi/libraries/libgc.a"))
-    #libgc = abspath("./lib/rpi/libraries/libgc.a")
-    libgc = "-lgc"
-    libpath = join(get_crystal_lib_path(), "rpi", "libraries")
-    env.Append(LINKFLAGS="-L%s -rdynamic -lpcre -lpthread -levent -lrt -ldl %s -l:libatomic_ops.so.1" % (libpath, libgc))
+
+    env.AlwaysBuild(env.Alias("add_crystal_link_flags", output_obj_file, env.Command("crlinkflags", linker_cmdline_file, add_link_flags)))
+    print("tgt set")
+    env.Depends("%s/%s/program" % (get_project_build_dir(), envname), "add_crystal_link_flags")
+    #env.Append(LINKFLAGS="-L%s%s -rdynamic -lpcre -lpthread -levent -lrt -ldl %s -l:libatomic_ops.so.1" % (libpath, local_libpath, libgc))
 
 def add_compile_crystal_extension():
     env.Append(SRC_FILTER="-<*/ext/sigfault.c>")
@@ -103,6 +119,7 @@ def export_crystal_path():
         env.AppendENVPath('CRYSTAL_PATH', get_crystal_lib_path())
         print("CRYSTAL_PATH=%s" % env['ENV']['CRYSTAL_PATH'])
 
+add_link_flags_adder()
 export_crystal_path()
 add_compile_crystal_extension()
 add_compile_crystal_target()
