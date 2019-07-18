@@ -22,45 +22,26 @@ def get_option(section, option, dft):
     else:
         return dft
 
+def get_env_option(name, default):
+    return get_option("env:%s" % envname, name, default)
+
 def get_crystal_target():
-    return get_option("env:%s" % envname, "crystal_target", "main")
+    return get_env_option("crystal_target", "main")
 
 def get_crystal_build_flags():
-    return get_option("env:%s" % envname, "crystal_build_flags", "")
+    return get_env_option("crystal_build_flags", "")
 
 def get_shards_binary():
-    return get_option("env:%s" % envname, "crystal_shards_bin", "shards")
+    return get_env_option("crystal_shards_bin", "shards")
 
 def get_crystal_binary():
-    return get_option("env:%s" % envname, "crystal_bin", "crystal")
+    return get_env_option("crystal_bin", "crystal")
 
 def get_crystal_triple():
-    return get_option("env:%s" % envname, "crystal_arch", "arm-unknown-linux-gnueabihf")
+    return get_env_option("crystal_arch", "arm-unknown-linux-gnueabihf")
 
 def get_crystal_lib_path():
-    return get_option("env:%s" % envname, "crystal_path_extra", "./lib")
-
-def add_link_flags(tgt, src, env):
-    with open(str(src[0]), 'r') as lcf:
-        linker_cmdline = lcf.read()
-
-    skip_idx = linker_cmdline.index("-rdynamic")
-    linker_cmdline = linker_cmdline[skip_idx:]
-
-    libdir_pt = re.compile('-L[^\s]+')
-    libcrystal_pt = re.compile('/[^\s]*libcrystal.a')
-
-    linker_cmdline = libdir_pt.sub('', libcrystal_pt.sub('', linker_cmdline))
-    print("Final crystal link args : %s" % linker_cmdline)
-
-    env.Append(LINKFLAGS="-L%s%s -l:libatomic_ops.so.1 %s" %(libpath, local_libpath, linker_cmdline))
-    return None
-
-
-def add_link_flags_adder():
-    alf = Builder(action = add_link_flags)
-    env.Append(BUILDERS = {'AddLinkFlags' : alf})
-
+    return get_env_option("crystal_path_extra", "./lib")
 
 def add_compile_crystal_target():
     input_file = get_crystal_target()
@@ -96,10 +77,6 @@ def add_compile_crystal_target():
     env.Depends("%s/%s/program" % (get_project_build_dir(), envname), output_obj_file)
     env.Append(PIOBUILDFILES=abspath(output_obj_file))
 
-    #env.AlwaysBuild(env.Alias("add_crystal_link_flags", output_obj_file, env.Command("crlinkflags", linker_cmdline_file, add_link_flags)))
-    #print("tgt set")
-    #env.Depends("%s/%s/program" % (get_project_build_dir(), envname), "add_crystal_link_flags")
-    #env.Append(LINKFLAGS="-L%s%s -rdynamic -lpcre -lpthread -levent -lrt -ldl %s -l:libatomic_ops.so.1" % (libpath, local_libpath, libgc))
     libpath = join(get_crystal_lib_path(), "rpi", "libraries")
     local_libraries_exist = exists(join(get_project_dir(), "libraries"))
     local_libpath = " -L" + join(get_project_dir(), "libraries") if local_libraries_exist else ""
@@ -107,12 +84,9 @@ def add_compile_crystal_target():
 
 def add_compile_crystal_extension():
     env.Append(SRC_FILTER="-<*/ext/sigfault.c>")
-    #libname = join(get_project_build_dir(), get_envname(), "libcrystal.a")
-    #libname = "crystal"
     libname = join(get_project_build_dir(), get_envname(), "crystal.o")
     env.Object(libname, ["src/ext/sigfault.c"])
     env.Append(LINKFLAGS=libname)
-    #env.Append(PIOBUILDFILES=abspath(libname))
     env.Depends("%s/%s/program" % (get_project_build_dir(), envname), libname)
 
 def export_crystal_path():
@@ -122,7 +96,6 @@ def export_crystal_path():
         env.AppendENVPath('CRYSTAL_PATH', get_crystal_lib_path())
         print("CRYSTAL_PATH=%s" % env['ENV']['CRYSTAL_PATH'])
 
-add_link_flags_adder()
 export_crystal_path()
 add_compile_crystal_extension()
 add_compile_crystal_target()
