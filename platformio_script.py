@@ -41,11 +41,6 @@ def get_crystal_lib_path():
     return get_option("env:%s" % envname, "crystal_path_extra", "./lib")
 
 def add_link_flags(tgt, src, env):
-    system("echo ALF > .fools")
-    libpath = join(get_crystal_lib_path(), "rpi", "libraries")
-    local_libraries_exist = exists(join(get_project_dir(), "libraries"))
-    local_libpath = " -L" + join(get_project_dir(), "libraries") if local_libraries_exist else ""
-
     with open(str(src[0]), 'r') as lcf:
         linker_cmdline = lcf.read()
 
@@ -59,6 +54,7 @@ def add_link_flags(tgt, src, env):
     print("Final crystal link args : %s" % linker_cmdline)
 
     env.Append(LINKFLAGS="-L%s%s -l:libatomic_ops.so.1 %s" %(libpath, local_libpath, linker_cmdline))
+    return None
 
 
 def add_link_flags_adder():
@@ -74,13 +70,16 @@ def add_compile_crystal_target():
     shard_yml = isfile("shard.yml")
     linker_cmdline_file = join(get_project_build_dir(), envname, "__linker_cmd_{}".format(relpath(input_file)))
 
-    compile = "{bin} build {crystal_target} --verbose -o{output} --cross-compile --target={target} {flags} > {file}".format(
+    sed_cmd = "sed -E -e 's/^.*-rdynamic//' -e 's/-L[^ ]+//g' -e 's/\/[^ ]+libcrystal.a//g'"
+
+    compile = "{bin} build {crystal_target} --verbose -o{output} --cross-compile --target={target} {flags} | {sed} > {file}".format(
         bin = get_shards_binary() if shard_yml else get_crystal_binary(),
         crystal_target = input_file if shard_yml or isfile(input_file) else "src/%s.cr" % input_file ,
         output = output_obj_file,
         target = get_crystal_triple(),
         flags = get_crystal_build_flags(),
-        file = linker_cmdline_file
+        file = linker_cmdline_file,
+        sed = sed_cmd
     )
 
     output_obj_file = output_obj_file + ".o"
@@ -97,10 +96,14 @@ def add_compile_crystal_target():
     env.Depends("%s/%s/program" % (get_project_build_dir(), envname), output_obj_file)
     env.Append(PIOBUILDFILES=abspath(output_obj_file))
 
-    env.AlwaysBuild(env.Alias("add_crystal_link_flags", output_obj_file, env.Command("crlinkflags", linker_cmdline_file, add_link_flags)))
-    print("tgt set")
-    env.Depends("%s/%s/program" % (get_project_build_dir(), envname), "add_crystal_link_flags")
+    #env.AlwaysBuild(env.Alias("add_crystal_link_flags", output_obj_file, env.Command("crlinkflags", linker_cmdline_file, add_link_flags)))
+    #print("tgt set")
+    #env.Depends("%s/%s/program" % (get_project_build_dir(), envname), "add_crystal_link_flags")
     #env.Append(LINKFLAGS="-L%s%s -rdynamic -lpcre -lpthread -levent -lrt -ldl %s -l:libatomic_ops.so.1" % (libpath, local_libpath, libgc))
+    libpath = join(get_crystal_lib_path(), "rpi", "libraries")
+    local_libraries_exist = exists(join(get_project_dir(), "libraries"))
+    local_libpath = " -L" + join(get_project_dir(), "libraries") if local_libraries_exist else ""
+    env.Append(LINKFLAGS = "@%s -L%s%s" % (linker_cmdline_file, libpath, local_libpath))
 
 def add_compile_crystal_extension():
     env.Append(SRC_FILTER="-<*/ext/sigfault.c>")
