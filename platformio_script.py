@@ -2,10 +2,11 @@ Import("env")
 from platformio import util
 from platformio.project.helpers import get_project_build_dir, get_project_dir
 from platformio.project.config import ProjectConfig
-from os.path import basename, join, relpath, abspath, isfile
+from os.path import basename, join, relpath, abspath, isfile, exists
 from os import environ
 import base64
 import subprocess
+import re
 
 config = ProjectConfig.get_instance(join(get_project_dir(), "platformio.ini"))
 
@@ -15,42 +16,32 @@ def get_envname():
 envname = get_envname()
 print("PBD: %s, env : %s" % (relpath(get_project_build_dir()), envname))
 
-def get_crystal_target():
-    if config.has_option("env:" + envname, "crystal_target"):
-        return config.get("env:" + envname, "crystal_target")
+def get_option(section, option, dft):
+    if config.has_option(section, option):
+        return config.get(section, option)
     else:
-        return "main"
+        return dft
+
+def get_env_option(name, default):
+    return get_option("env:%s" % envname, name, default)
+
+def get_crystal_target():
+    return get_env_option("crystal_target", "main")
 
 def get_crystal_build_flags():
-    if config.has_option("env:" + envname, "crystal_build_flags"):
-        return config.get("env:" + envname, "crystal_build_flags")
-    else:
-        return ""
+    return get_env_option("crystal_build_flags", "")
 
 def get_shards_binary():
-    if config.has_option("env:" + envname, "crystal_shards_bin"):
-        return config.get("env:" + envname, "crystal_shards_bin")
-    else:
-        return "shards"
+    return get_env_option("crystal_shards_bin", "shards")
 
 def get_crystal_binary():
-    if config.has_option("env:" + envname, "crystal_bin"):
-        return config.get("env:" + envname, "crystal_bin")
-    else:
-        return "crystal"
+    return get_env_option("crystal_bin", "crystal")
 
 def get_crystal_triple():
-    if config.has_option("env:" + envname, "crystal_arch"):
-        return config.get("env:" + envname, "crystal_arch")
-    else:
-        return "arm-unknown-linux-gnueabihf"
+    return get_env_option("crystal_arch", "arm-unknown-linux-gnueabihf")
 
 def get_crystal_lib_path():
-    if config.has_option("env:" + envname, "crystal_path_extra"):
-        return config.get("env:" + envname, "crystal_path_extra")
-    else:
-        return "./lib"
-
+    return get_env_option("crystal_path_extra", "./lib")
 
 def add_compile_crystal_target():
     input_file = get_crystal_target()
@@ -58,13 +49,18 @@ def add_compile_crystal_target():
     print("output file : %s" % output_obj_file)
 
     shard_yml = isfile("shard.yml")
+    linker_cmdline_file = join(get_project_build_dir(), envname, "__linker_cmd_{}".format(relpath(input_file)))
 
-    compile = "{bin} build {crystal_target} --verbose -o{output} --cross-compile --target={target} {flags}".format(
+    sed_cmd = "sed -E -e 's/^.*-rdynamic//' -e 's/-L[^ ]+//g' -e 's/\/[^ ]+libcrystal.a//g'"
+
+    compile = "{bin} build {crystal_target} --verbose -o{output} --cross-compile --target={target} {flags} | {sed} > {file}".format(
         bin = get_shards_binary() if shard_yml else get_crystal_binary(),
         crystal_target = input_file if shard_yml or isfile(input_file) else "src/%s.cr" % input_file ,
         output = output_obj_file,
         target = get_crystal_triple(),
-        flags = get_crystal_build_flags()
+        flags = get_crystal_build_flags(),
+        file = linker_cmdline_file,
+        sed = sed_cmd
     )
 
     output_obj_file = output_obj_file + ".o"
@@ -80,20 +76,17 @@ def add_compile_crystal_target():
 
     env.Depends("%s/%s/program" % (get_project_build_dir(), envname), output_obj_file)
     env.Append(PIOBUILDFILES=abspath(output_obj_file))
-    #env.Append(PIOBUILDFILES=abspath("./lib/rpi/libraries/libgc.a"))
-    #libgc = abspath("./lib/rpi/libraries/libgc.a")
-    libgc = "-lgc"
+
     libpath = join(get_crystal_lib_path(), "rpi", "libraries")
-    env.Append(LINKFLAGS="-L%s -rdynamic -lpcre -lpthread -levent -lrt -ldl %s -l:libatomic_ops.so.1" % (libpath, libgc))
+    local_libraries_exist = exists(join(get_project_dir(), "libraries"))
+    local_libpath = " -L" + join(get_project_dir(), "libraries") if local_libraries_exist else ""
+    env.Append(LINKFLAGS = "@%s -L%s%s" % (linker_cmdline_file, libpath, local_libpath))
 
 def add_compile_crystal_extension():
     env.Append(SRC_FILTER="-<*/ext/sigfault.c>")
-    #libname = join(get_project_build_dir(), get_envname(), "libcrystal.a")
-    #libname = "crystal"
     libname = join(get_project_build_dir(), get_envname(), "crystal.o")
     env.Object(libname, ["src/ext/sigfault.c"])
     env.Append(LINKFLAGS=libname)
-    #env.Append(PIOBUILDFILES=abspath(libname))
     env.Depends("%s/%s/program" % (get_project_build_dir(), envname), libname)
 
 def export_crystal_path():
