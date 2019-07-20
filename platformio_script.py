@@ -53,7 +53,7 @@ def add_compile_crystal_target():
 
     sed_cmd = "sed -E -e 's/^.*-rdynamic//' -e 's/-L[^ ]+//g' -e 's/\/[^ ]+libcrystal.a//g'"
 
-    compile = "{bin} build {crystal_target} --verbose -o{output} --cross-compile --target={target} {flags} | {sed} > {file}".format(
+    compile = "{bin} build {crystal_target} --verbose -o{output} --cross-compile --target={target} {flags} | {sed} | tee {file}".format(
         bin = get_shards_binary() if shard_yml else get_crystal_binary(),
         crystal_target = input_file if shard_yml or isfile(input_file) else "src/%s.cr" % input_file ,
         output = output_obj_file,
